@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Steam买买买
 // @namespace    https://greasyfork.org/users/471937
-// @version      0.5.1
+// @version      0.5.2
 // @description  在软锁区游戏商店页面自动显示widget、社区与愿望单链接
 // @author       油油
 // @match        *://store.steampowered.com/*
@@ -10,19 +10,33 @@
 
 window.addEventListener('load', function () {
     var url_path = location.pathname.split('/'),
-        id = url_path[url_path.indexOf('app') + 1]
+        game_id = url_path[url_path.indexOf('app') + 1]
     var tmp;
 
+    // 绑定全局变量
+    var $ = window.jQuery,
+        AddToWishlist = window.AddToWishlist
+
+    // 匹配用户主页
+    var user_id;
+    tmp = $('a.user_avatar')
+    if (tmp) user_id = tmp.attr('href').match(/(id|profiles)\/.+?\//)[0]
+    console.log(user_id)
+
     // 反锁区
-    tmp = document.getElementById('error_box')
-    if (tmp) {
-        add_frame(`${location.origin}/widget/${id}`, tmp)
-        var btn_div = document.createElement('div')
-        tmp.appendChild(btn_div)
-        add_btn('添加到愿望单', `javascript:AddToWishlist(${id});`, btn_div)
-        add_btn('社区中心', `https://steamcommunity.com/app/${id}/`, btn_div)
+    tmp = $('#error_box')
+    if (tmp[0]) {
+        add_frame(`${location.origin}/widget/${game_id}`, tmp)
+        var btn_div = $('<div>')
+        tmp.append(btn_div)
+        add_btn('添加到愿望单', () => {
+            AddToWishlist(game_id)
+            window.open(`https://store.steampowered.com/wishlist/${user_id}#sort=dateadded`)
+        }, btn_div)
+        add_btn('社区中心', `https://steamcommunity.com/app/${game_id}/`, btn_div)
     }
 
+    // TODO: 分域名小功能
     switch (url_path[1]) {
         case 'agecheck':
             // 自动agegate
@@ -37,26 +51,20 @@ window.addEventListener('load', function () {
     }
 
     function add_btn(text, action, pool) {
-        // 创建按钮
-        var btn = document.createElement('a')
-        btn.className = 'btnv6_blue_blue_innerfade btn_medium noicon'
-        var btn_text = document.createElement('span')
-        btn_text.innerText = text
-        btn.appendChild(btn_text)
-        pool.appendChild(btn)
-
-        // 绑定动作
-        if (typeof action == 'function') btn.onclick = action
-        else btn.href = action
+        var btn = $('<a>').append($('<span>').append(text))
+            .addClass('btnv6_blue_blue_innerfade btn_medium noicon')
+        pool.append(btn)
+        if (typeof action == 'function') btn.on('click', action)
+        else btn.attr('href', action)
     }
 
     function add_frame(url, pool) {
-        var ifr = document.createElement('iframe')
-        ifr.style.width = '100%'
-        ifr.addEventListener('load', () => {
-            ifr.style.height = `${ifr.contentWindow.document.body.scrollHeight}px`
-        })
-        ifr.src = url
-        pool.appendChild(ifr)
+        pool.append(
+            $('<iframe>').css('width', '100%')
+                .attr('src', url)
+                .on('load', function (x) {
+                    this.style.height = `${this.contentWindow.document.body.scrollHeight}px`
+                })
+        )
     }
 });
