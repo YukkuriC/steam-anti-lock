@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Steam买买买
 // @namespace    https://greasyfork.org/users/471937
-// @version      0.6.0
+// @version      0.6.1
 // @description  在软锁区游戏商店页面自动显示widget、社区与愿望单链接
 // @author       油油
 // @match        store.steampowered.com/*
@@ -13,7 +13,8 @@
 window.addEventListener('load', function () {
     var url_path = location.pathname.split('/'),
         game_id = url_path[url_path.indexOf('app') + 1],
-        user_id, game_title, game_image, game_subid,
+        user_id, game_title, game_image,
+        game_subs, game_bundles, game_dlcs,
         steamdb_url = `https://steamdb.info/app/${game_id}/subs/`,
         tmp;
 
@@ -55,8 +56,11 @@ window.addEventListener('load', function () {
 
             // widget iframe
             add_frame(`${location.origin}/widget/${game_id}`, tmp)
-            var my_widget = $('<div>').css('width', '100%')
-            tmp.append(my_widget)
+            var img_panel, sub_panel
+            tmp.append($('<div>').css({ width: '100%', display: 'flex' })
+                .append(img_panel = $('<div>'))
+                .append(sub_panel = $('<div>').css({ display: 'flex', 'flex-direction': 'column' }))
+            )
 
             // 查询按钮
             var btn_div = $('<div>')
@@ -75,38 +79,39 @@ window.addEventListener('load', function () {
                 var title = page.find('.pagehead h1'),
                     icon = page.find('.row.app-row .span4 img'),
                     sub_tables = page.find('#subs table')
+                dlc_tables = page.find('#dlc table')
                 game_title = title.text()
                 game_image = icon[0]
-                for (var i = 0; i < sub_tables.length; i++) {// 搜索游戏本地subID
+                for (var i = 0; i < sub_tables.length; i++) {// 搜索游戏sub+礼包
                     var table = sub_tables[i]
-                    try {
-                        if (table.rows[0].cells[0].innerText.toUpperCase() == 'SUBID') {
-                            for (var j = 1; j < table.rows.length; j++) {
-                                var row = table.rows[j].cells
-                                if (row[2].innerText.indexOf('Store') >= 0
-                                    && $(row[1]).find('a').length > 0) {
-                                    game_subid = row[0].innerText
-                                }
-                            }
+                    switch (table.rows[0].cells[0].innerText.toUpperCase()) {
+                        case 'SUBID': // Sub
+                            game_subs = iter_steamdb_table(table)
                             break
-                        }
-                    } catch (e) { }
+                        case 'ID': // Bundle
+                            game_bundles = iter_steamdb_table(table)
+                            break
+                    }
                 }
+                if (dlc_tables.length > 0) game_dlcs = iter_steamdb_table(dlc_tables[0]) // 搜索游戏DLC
 
                 // 写入信息
                 if (game_title) $('.pageheader').html(document.title = `买买买: ${game_title}`)
-                if (game_image) my_widget.append(
+                if (game_image) img_panel.append(
                     $('<a>').attr('title', 'SteamDB').attr('href', steamdb_url).append(game_image)
                 )
-                if (game_subid) add_btn(`SubID: ${game_subid}`, `/sub/${game_subid}/?utm_source=SteamDB`, btn_div)
+                add_links('Sub列表', game_subs, '/sub/@/', sub_panel)
+                add_links('DLC列表', game_dlcs, '/app/@/', sub_panel)
+                add_links('礼包列表', game_bundles, '/bundle/@/', sub_panel)
             })
         }
     }
 
     // 添加按钮
-    function add_btn(text, action, pool) {
+    function add_btn(text, action, pool, assign = {}) {
         var btn = $('<a>').append($('<span>').append(text))
-            .addClass('btnv6_blue_blue_innerfade btn_medium noicon')
+            .addClass('btnv6_blue_blue_innerfade btn_medium')
+            .attr(assign)
         pool.append(btn)
         if (typeof action == 'function') btn.on('click', action)
         else btn.attr('href', action)
@@ -127,6 +132,16 @@ window.addEventListener('load', function () {
         )
     }
 
+    // 批量添加按钮(DLC、礼包、Sub)
+    function add_links(title, data, link_fmt, pool) {
+        if (!(data && data.length > 0)) return
+        pool.append(title)
+        data.forEach(sub => add_btn(
+            sub[1], link_fmt.replace(/@/g, sub[0]),
+            pool, { class: 'btnv6_blue_hoverfade btn_small', title: `ID: ${sub[0]}` }
+        ))
+    }
+
     // SteamDB查询游戏信息
     var cached_page = null
     function query_steamDB(callback) {
@@ -136,5 +151,18 @@ window.addEventListener('load', function () {
             url: steamdb_url,
             onload: response => { callback(cached_page = $(response.responseText)) }
         })
+    }
+
+    // 迭代查询SteamDB package表格
+    function iter_steamdb_table(table) {
+        var res = []
+        for (var tbody of table.tBodies) for (var row of tbody.rows) {
+            row = row.cells
+            if ($(row[1]).find('a').length > 0) res.push([
+                row[0].innerText, // ID
+                row[1].innerText, // 标题
+            ])
+        }
+        return res
     }
 });

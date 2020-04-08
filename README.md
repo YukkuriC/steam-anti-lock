@@ -11,18 +11,20 @@
 
 ## 实现功能
 
-1. 匹配链接中的商品ID，自动生成购买链接的widget iframe与
+1. 匹配链接中的商品ID，自动生成购买链接的widget iframe
 
 2. 自动创建功能按钮
    1. 添加至愿望单
    2. 查看社区主页
 
 3. 跨域接入[SteamDB](https://steamdb.info/)
-   1. 通过游戏ID查询Sub ID、游戏标题、游戏图像
-   2. 可访问Sub购买页面
+   1. 通过游戏ID游戏标题、游戏图像
+   2. 自动查询所有关联Sub、礼包、DLC，并可跳转至购买页
    3. 可访问SteamDB查询页面
 
 ## TODO(或许有)
 
 * 根据名称搜索游戏ID的API
 * steam内部创建购物车sub form的API
+* 判断SteamDB接口是否被百度云加速屏蔽
+* 完成自动填写R18警告功能
