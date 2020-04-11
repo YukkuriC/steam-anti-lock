@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Steam买买买
 // @namespace    https://greasyfork.org/users/471937
-// @version      0.6.1
+// @version      0.7.0
 // @description  在软锁区游戏商店页面自动显示widget、社区与愿望单链接
 // @author       油油
 // @match        store.steampowered.com/*
@@ -20,7 +20,9 @@ window.addEventListener('load', function () {
 
     // 绑定全局变量
     var $ = unsafeWindow.jQuery,
-        AddToWishlist = unsafeWindow.AddToWishlist
+        AddToWishlist = unsafeWindow.AddToWishlist,
+        ShowConfirmDialog = unsafeWindow.ShowConfirmDialog,
+        sessionid = unsafeWindow.g_sessionID
 
     // 分域名处理
     switch (url_path[1]) {
@@ -78,8 +80,8 @@ window.addEventListener('load', function () {
                 // 匹配信息
                 var title = page.find('.pagehead h1'),
                     icon = page.find('.row.app-row .span4 img'),
-                    sub_tables = page.find('#subs table')
-                dlc_tables = page.find('#dlc table')
+                    sub_tables = page.find('#subs table'),
+                    dlc_tables = page.find('#dlc table')
                 game_title = title.text()
                 game_image = icon[0]
                 for (var i = 0; i < sub_tables.length; i++) {// 搜索游戏sub+礼包
@@ -103,6 +105,15 @@ window.addEventListener('load', function () {
                 add_links('Sub列表', game_subs, '/sub/@/', sub_panel)
                 add_links('DLC列表', game_dlcs, '/app/@/', sub_panel)
                 add_links('礼包列表', game_bundles, '/bundle/@/', sub_panel)
+
+                // 插入直接购买按钮
+                game_subs.forEach(sub => {
+                    add_cart_form(sub[0])
+                    add_btn(
+                        '购买' + sub[1], `javascript:addToCart(${sub[0]})`,
+                        btn_div, { class: 'btnv6_green_white_innerfade btn_medium', title: `ID: ${sub[0]}` }
+                    )
+                })
             })
         }
     }
@@ -149,7 +160,17 @@ window.addEventListener('load', function () {
         else GM_xmlhttpRequest({
             method: 'GET',
             url: steamdb_url,
-            onload: response => { callback(cached_page = $(response.responseText)) }
+            onload: response => {
+                var page = $(response.responseText)
+                if (not_steamdb(page)) {
+                    //ShowAlertDialog('','')
+                    ShowConfirmDialog('SteamDB未正常加载', '可能被百度云加速拦截<br>请确保弹出的页面正常访问后刷新本页面<br>是否打开?', '确认', '取消')
+                        .done(x => {
+                            window.open(steamdb_url)
+                        })
+                }
+                else callback(cached_page = page)
+            }
         })
     }
 
@@ -164,5 +185,21 @@ window.addEventListener('load', function () {
             ])
         }
         return res
+    }
+
+    // 插入购物车表单
+    function add_cart_form(subid) {
+        $('body').append($('<form>')
+            .attr({ name: `add_to_cart_${subid}`, action: '/cart/', method: 'POST', target: '_blank' })
+            .append($('<input>').attr({ type: 'hidden', name: 'sessionid', value: sessionid }))
+            .append($('<input>').attr({ type: 'hidden', name: 'action', value: "add_to_cart" }))
+            .append($('<input>').attr({ type: 'hidden', name: 'subid', value: subid }))
+        )
+    }
+
+    // 判断页面是否未正常加载
+    // e.g. 被百度云加速拦截
+    function not_steamdb(page) {
+        return page.find('.yjs-wrapper').length > 0
     }
 });
