@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Steam买买买
 // @namespace    https://greasyfork.org/users/471937
-// @version      0.7.0
+// @version      0.8.0
 // @description  在软锁区游戏商店页面自动显示widget、社区与愿望单链接
 // @author       油油
 // @match        store.steampowered.com/*
@@ -22,6 +22,7 @@ window.addEventListener('load', function () {
     var $ = unsafeWindow.jQuery,
         AddToWishlist = unsafeWindow.AddToWishlist,
         ShowConfirmDialog = unsafeWindow.ShowConfirmDialog,
+        ViewProductPage = unsafeWindow.ViewProductPage,
         sessionid = unsafeWindow.g_sessionID
 
     // 分域名处理
@@ -36,7 +37,7 @@ window.addEventListener('load', function () {
                 document.getElementById('ageDay').value = 1
                 document.getElementById('ageMonth').value = 'January'
                 document.getElementById('ageYear').value = 1901
-                console.log('test') // 未完成
+                ViewProductPage()
             }
         case 'app':
             match_user()
@@ -98,7 +99,12 @@ window.addEventListener('load', function () {
                 if (dlc_tables.length > 0) game_dlcs = iter_steamdb_table(dlc_tables[0]) // 搜索游戏DLC
 
                 // 写入信息
-                if (game_title) $('.pageheader').html(document.title = `买买买: ${game_title}`)
+                if (game_title)
+                    $('.pageheader').html(document.title = `买买买: ${game_title}`)
+                else
+                    $('.pageheader').parent().append(
+                        $('<a>').attr('title', 'SteamDB').attr('href', steamdb_url).html('若页面未成功加载购买按钮，可尝试点击该链接后刷新')
+                    )
                 if (game_image) img_panel.append(
                     $('<a>').attr('title', 'SteamDB').attr('href', steamdb_url).append(game_image)
                 )
@@ -162,14 +168,7 @@ window.addEventListener('load', function () {
             url: steamdb_url,
             onload: response => {
                 var page = $(response.responseText)
-                if (not_steamdb(page)) {
-                    //ShowAlertDialog('','')
-                    ShowConfirmDialog('SteamDB未正常加载', '可能被百度云加速拦截<br>请确保弹出的页面正常访问后刷新本页面<br>是否打开?', '确认', '取消')
-                        .done(x => {
-                            window.open(steamdb_url)
-                        })
-                }
-                else callback(cached_page = page)
+                callback(cached_page = page)
             }
         })
     }
@@ -195,11 +194,5 @@ window.addEventListener('load', function () {
             .append($('<input>').attr({ type: 'hidden', name: 'action', value: "add_to_cart" }))
             .append($('<input>').attr({ type: 'hidden', name: 'subid', value: subid }))
         )
-    }
-
-    // 判断页面是否未正常加载
-    // e.g. 被百度云加速拦截
-    function not_steamdb(page) {
-        return page.find('.yjs-wrapper').length > 0
     }
 });
